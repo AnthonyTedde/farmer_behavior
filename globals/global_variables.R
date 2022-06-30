@@ -96,7 +96,15 @@ milk_potential_predictors <- c(
 
 y <- "gradient_axis1"
 
-ncpu <- ifelse(parallel::detectCores() >= 10, 10, 5)
-niter <- 150
-initial_set_n <- 10
-early_stop <- 10
+if ( grepl("[ate][Lalitude]", Sys.info()["nodename"]) ){
+  # Then local
+  ncpu <- 5
+  niter <- 150
+  initial_set_n <- 10
+  early_stop <- 10
+}else{ 
+  ncpu <- 10
+  niter <- 500
+  initial_set_n <- 40
+  early_stop <- 40
+}
