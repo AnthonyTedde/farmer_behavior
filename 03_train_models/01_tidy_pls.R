@@ -42,8 +42,8 @@ get_recipe <- function(dat){
 get_model <- function(){
   
   parsnip::pls(
-    num_comp = tune::tune()
-    #predictor_prop = tune::tune()
+    num_comp = tune::tune(),
+    predictor_prop = tune::tune()
   ) %>% 
     parsnip::set_engine("mixOmics") %>% 
     parsnip::set_mode("regression")
@@ -99,6 +99,10 @@ run_mdl <- function(wfl, dat_cv, param, iter = 500){
   )
   return(pls_mod_wfl_rslt)
 }
+
+# For test purpose
+# initial_set_n <- 4
+# early_stop <- 1
  
 doParallel::registerDoParallel(cores = ncpu) 
 options(tidymodels.dark = T)
