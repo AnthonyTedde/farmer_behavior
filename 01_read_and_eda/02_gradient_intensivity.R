@@ -16,7 +16,7 @@ t <- technico_dat %>%
   
 npc <- 2 
 technico_pca <- FactoMineR::PCA(t, ncp = npc)
-factoextra::fviz_pca_ind(pca, geom.ind = "point")
+#factoextra::fviz_pca_ind(technico_pca, geom.ind = "point")
 
 technico_maha <- mahalanobis(technico_pca$ind$coord,
                              center = colMeans(technico_pca$ind$coord),

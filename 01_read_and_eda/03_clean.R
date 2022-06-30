@@ -1,3 +1,4 @@
+library(magrittr)
 data("technico_milk")
 
 technico_milk %>% 
