@@ -1,7 +1,7 @@
-save_model <- function(type){ 
-  obj <- paste(d, type, sep = "_")
-  assign(obj, mdl)
-  save(list = obj,
-       file = glue::glue("data/{obj}.rda"),
+save_model <- function(obj, type){ 
+  nam <- paste(d, type, sep = "_")
+  assign(nam, obj)
+  save(list = nam,
+       file = glue::glue("data/{nam}.rda"),
        compress = "xz")
 }

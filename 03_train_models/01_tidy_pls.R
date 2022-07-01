@@ -132,8 +132,8 @@ for(d in dat_vect){
     iter = niter # CECI globals
   )
   # Save result
-  save_model("rslt")
-  save_model("wfl")
+  save_model(obj = mdl, type = "rslt")
+  save_model(obj = wfl, type = "wfl")
   # Save progress
   dat_vect <- setdiff(dat_vect, d)
   save(dat_vect, file = here::here("data", "dat_vect.rda"))
