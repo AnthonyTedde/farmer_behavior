@@ -7,8 +7,8 @@ data("train_quarter_full")
 data("train_full_cv")
 data("train_quarter_full_cv")
 # test
-data("test_full")
-data("test_quarter_full")
+# data("test_full")
+# data("test_quarter_full")
 # data("train_q20")
 # data("train_q10")
 # data("train_q05")
@@ -196,41 +196,47 @@ options(tidymodels.dark = T)
 # dat_vect <- c("train_full", "train_q20", "train_q10", "train_q05") 
 m <- "xgb"
 
-dat_vect <- c("train_full", "train_quarter_full") 
-
-thres <- seq(0, .9, by = .1) # CECI by change by .1
+if(file.exists("data/step.rda")){
+  data("step")
+}else{
+  dat_vect <- c("train_full", "train_quarter_full")  
+  thres <- seq(0, .9, by = .1) # CECI by change by .1 
+  step <- purrr::cross(list(d = dat_vect, t = thres)) 
+}
 
 tictoc::tic()
-for(t in thres){ 
-  for(d in dat_vect){
-    print(glue::glue("#-------------------     {d}/{t}     -------------------#"))
-    dat <- get(d)
-    print(dim(dat))
-    # To change (branquignole):
-    type <- ifelse(length(strsplit(d, split = "_")[[1]]) == 3, "quarter", "full")
-    dat_cv <- get(paste(d, "cv", sep = "_"))
-    recipe <- get_recipe(dat, t, type = type)
-    mod <- get_model()
-    wfl <- get_workflow(mod, recipe)
-    
-    param <- get_param(wfl)
-    mdl <- run_mdl(wfl, dat_cv, param, iter = 150)
-    # save result
-    loss <- stringr::str_pad(t * 100, width = 3, pad = "0")
-    mdl_name <- paste(d, m, loss, "rslt", sep = "_")
-    assign(mdl_name, mdl)
-    save(list = mdl_name,
-         file = glue::glue("data/{mdl_name}.rda"),
-         compress = "xz")
-    # Save workflow
-    wfl_name <- paste(d, m, loss, "wfl", sep = "_")
-    assign(wfl_name, wfl)
-    save(list = wfl_name, 
-         file = glue::glue("data/{wfl_name}.rda"),
-         compress = "xz")
-  }
+for(s in step){
+  print(glue::glue("#-------------------     {s$d}/{s$t}     -------------------#"))
+  dat <- get(s$d)
+  print(dim(dat))
+  # To change (branquignole):
+  type <- ifelse(length(strsplit(s$d, split = "_")[[1]]) == 3, "quarter", "full")
+  dat_cv <- get(paste(s$d, "cv", sep = "_"))
+  recipe <- get_recipe(dat, s$t, type = type)
+  mod <- get_model()
+  wfl <- get_workflow(mod, recipe)
+  
+  param <- get_param(wfl)
+  mdl <- run_mdl(wfl, dat_cv, param, iter = 150)
+  # save result
+  loss <- stringr::str_pad(s$t * 100, width = 3, pad = "0")
+  mdl_name <- paste(s$d, m, loss, "rslt", sep = "_")
+  assign(mdl_name, mdl)
+  save(list = mdl_name,
+       file = glue::glue("data/{mdl_name}.rda"),
+       compress = "xz")
+  # Save workflow
+  wfl_name <- paste(s$d, m, loss, "wfl", sep = "_")
+  assign(wfl_name, wfl)
+  save(list = wfl_name, 
+       file = glue::glue("data/{wfl_name}.rda"),
+       compress = "xz") 
+  # Save progression
+  step <- step[-1]
+  save(step, file = "data/step.rda")
 }
 tictoc::toc()
 
+if(file.exists("data/step.rda")) file.remove("data/step.rda")
 
 # Thank you CECI !
