@@ -3,6 +3,7 @@ library(magrittr)
 source("globals/global_variables.R")
 data("technico_dat")
 data("milk_dat")
+data("milk_quarter_dat")
 
 technico_dat$exercice %>% table
 
@@ -67,3 +68,21 @@ technico_milk <- technico_dat %>%
 save(technico_milk, file = "data/technico_milk.rda")
 
 
+# ----------------------------------------------------------------------------------------
+# Merge milk data with Dalcq AC gradient QUARTERLY ####
+# ----------------------------------------------------------------------------------------
+
+technico_milk_quarter <- technico_dat %>% 
+  dplyr::inner_join(match) %>% 
+  dplyr::mutate(
+    year = stringr::str_pad(exercice, width = 3, pad = "0") %>%
+    # year = stringr::str_pad(EXERCICE, width = 3, pad = "0") %>% 
+      paste0(2, .) %>% as.integer()
+  ) %>%   
+  dplyr::inner_join(milk_quarter_dat, by = c("farmerID", "year")) %>% 
+  tibble::as_tibble()
+
+
+save(technico_milk_quarter, 
+     file = "data/technico_milk_quarter.rda", 
+     compress = "xz")

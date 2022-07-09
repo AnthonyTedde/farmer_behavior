@@ -1,7 +1,7 @@
 # Milk columns
-milk_col_names <- c(
-  "farmerID", "year",
-  "fat", "protein", "urea", "lactose", "pfat",
+labo <- c("fat", "protein", "urea", "lactose")
+predictions <- c( 
+  "pfat",
   "pmilk", "pch4_mir", "plactose", 
   "plactofer_EMR", "plactofer_no_EMR", "pmilk_Lactofer_EMR",
   "pch4_full",
@@ -35,6 +35,24 @@ milk_col_names <- c(
   "pIGF.1_blood", "pglucose_blood", "purea_blood", "pcholesterol_blood", 
   "pfructosamine_blood", "pBOHB_log10_blood", "pNEFA_blood", "pprogesterone_blood",
   "pDMI", "pRFI1", "pRFI2"
+)
+milk_col_names <- c(
+  # identifiers
+  "farmerID", "year",
+  # Labo
+  labo,
+  # Prediction
+  predictions
+)  
+milk_month_col_names <- c(
+  # identifiers
+  "farmerID", "year", "month",
+  # Labo
+  paste("n", labo, sep = "_"),
+  labo,
+  # Prediction
+  paste("n", predictions, sep = "_"),
+  predictions
 )  
 
 # AC-gradient variables
@@ -99,9 +117,9 @@ y <- "gradient_axis1"
 if ( grepl("[ate][Lalitude]", Sys.info()["nodename"]) ){
   # Then local
   ncpu <- 5
-  niter <- 150
+  niter <- 15
   initial_set_n <- 10
-  early_stop <- 10
+  early_stop <- 1
 }else{ 
   ncpu <- 10
   niter <- 1000

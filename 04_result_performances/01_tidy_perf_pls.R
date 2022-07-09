@@ -11,6 +11,7 @@ data("train_q20")
 data("train_q10")
 data("train_q05")
 data("test_full")
+data("technico_milk")
 
 # Load models results
 data("train_full_rslt")
@@ -117,6 +118,188 @@ perf_lst$test %>%
   dplyr::group_by(perf_type, data_type, fit_type) %>% 
   yardstick::rmse(truth = gradient_axis1, estimate = prd)
 
+# - Best full -  << #
+
+# 1% worst
+#
+rem <- technico_milk %>% 
+  dplyr::group_by(farmerID) %>% 
+  dplyr::count() %>% 
+  dplyr::mutate(
+    remove = ifelse(n < 3, T, F)
+  )
+
+
+train_full_rslt$.metrics[[1]]
+
+tune::show_best(train_full_rslt, n = 700) %>% 
+  ggplot2::ggplot(ggplot2::aes(num_comp, y = predictor_prop, z = mean)) +
+  ggplot2::stat_density2d_filled()
+  
+plt <- function(dat){ 
+  dat %>% 
+    ggplot2::ggplot(ggplot2::aes(x = .pred, y = gradient_axis1)) +
+    ggplot2::geom_point(ggplot2::aes(color = keep_099)) + 
+    ggplot2::geom_abline(intercept = 0, slope = 1, color = "darkred")
+}
+augment_dt <- function(newd){ 
+  train_full_pls_fit_bst %>% 
+    broom::augment(new_data = newd) %>% 
+    dplyr::mutate(residuals = gradient_axis1 - .pred) %>% 
+    dplyr::mutate(
+      keep_099 = dplyr::case_when(
+        residuals <= quantile(residuals, prob = .005) ~ F,
+        residuals >= quantile(residuals, prob = .995) ~ F,
+        T ~ T
+      ), 
+      keep_098 = dplyr::case_when(
+        residuals <= quantile(residuals, prob = .010) ~ F,
+        residuals >= quantile(residuals, prob = .990) ~ F,
+        T ~ T
+      ),
+      ) %>% 
+    dplyr::inner_join(rem)
+}
+
+perf <- function(dat, filter = T){ 
+  d <- dat %>% 
+    dplyr::filter(filter)
+  list(
+    r2 = yardstick::rsq(d, truth = gradient_axis1, estimate = .pred),
+    rmse = yardstick::rmse(d, truth = gradient_axis1, estimate = .pred)
+  ) %>% dplyr::bind_rows()
+}
+
+train_full_augmented <- augment_dt(newd = train_full)
+test_full_augmented <- augment_dt(newd = test_full) 
+
+# full
+perf(dat = train_full_augmented) 
+perf(dat = test_full_augmented) 
+# 99%
+perf(dat = train_full_augmented, filter = train_full_augmented$keep_099) 
+perf(dat = test_full_augmented, filter = test_full_augmented$keep_099) 
+# 99%
+perf(dat = train_full_augmented, filter = train_full_augmented$keep_098) 
+perf(dat = test_full_augmented, filter = test_full_augmented$keep_098) 
+
+# Pref by year
+train_full_augmented %>% 
+  # dplyr::filter(keep_099) %>%
+  dplyr::group_by(year) %>% 
+  dplyr::mutate(n = dplyr::n()) %>% 
+  dplyr::group_by(n, .add = T) %>% 
+  yardstick::rmse(truth = gradient_axis1, estimate = .pred)
+test_full_augmented %>% 
+  # dplyr::filter(keep_099) %>%
+  dplyr::group_by(year) %>% 
+  dplyr::mutate(n = dplyr::n()) %>% 
+  dplyr::group_by(n, .add = T) %>% 
+  yardstick::rmse(truth = gradient_axis1, estimate = .pred)
+
+# Degree of intensification by year
+train_full_augmented %>% 
+  dplyr::select(year, gradient_axis1, .pred, farmerID) %>% 
+  dplyr::rename(
+    obs = gradient_axis1,
+    prd = .pred
+  ) %>% 
+  tidyr::pivot_longer(cols = c("obs", "prd"),
+                      names_to = "gradient") %>% 
+  dplyr::mutate(year = ordered(year)) %>% 
+  ggplot2::ggplot(ggplot2::aes(axis1 = year, axis2 = year, y = value)) +
+  # ggplot2::ggplot(ggplot2::aes(x = year, y = value, 
+  #                              color = gradient, group = farmerID)) +
+  ggalluvial::geom_flow() +
+  scale_x_discrete(limits = c("str", "end")) +
+  ggalluvial::geom_stratum() 
+# +
+#   ggplot2::geom_text(stat = "stratum", aes(label = ggalluvial::after_stat(stratum)))
+
+set.seed(1010)
+sub <- train_full_augmented %>% 
+  dplyr::group_by(farmerID) %>% 
+  dplyr::count() %>% 
+  dplyr::ungroup() %>% 
+  dplyr::filter(n == max(n)) %>% 
+  dplyr::sample_n(size = 12)
+
+train_full_augmented %>% 
+  dplyr::inner_join(sub) %>% 
+  dplyr::select(year, gradient_axis1, .pred, farmerID) %>% 
+  dplyr::rename(
+    obs = gradient_axis1,
+    prd = .pred
+  ) %>% 
+  tidyr::pivot_longer(cols = c("obs", "prd"),
+                      names_to = "gradient") %>% 
+  dplyr::mutate(year = ordered(year)) %>% 
+  ggplot2::ggplot(ggplot2::aes(x = year, y = value, group = gradient, color = gradient)) + 
+  ggplot2::geom_point() +
+  ggplot2::geom_smooth() +
+  # ggplot2::geom_line() +
+  ggplot2::facet_wrap("farmerID", nrow = 3)
+
+set.seed(1010)
+sub <- test_full_augmented %>% 
+  dplyr::group_by(farmerID) %>% 
+  dplyr::count() %>% 
+  dplyr::ungroup() %>% 
+  dplyr::filter(n == max(n)) %>% 
+  dplyr::sample_n(size = 6)
+
+test_full_augmented %>% 
+  dplyr::inner_join(sub) %>% 
+  dplyr::select(year, gradient_axis1, .pred, farmerID) %>% 
+  dplyr::rename(
+    obs = gradient_axis1,
+    prd = .pred
+  ) %>% 
+  tidyr::pivot_longer(cols = c("obs", "prd"),
+                      names_to = "gradient") %>% 
+  dplyr::mutate(year = ordered(year)) %>% 
+  ggplot2::ggplot(ggplot2::aes(x = year, y = value, group = gradient, color = gradient)) + 
+  ggplot2::geom_point() +
+  # ggplot2::geom_smooth(se = F) + 
+  ggplot2::geom_line() +
+  ggplot2::facet_wrap("farmerID", nrow = 3)
+
+# -- > categories longitudinal
+
+
+
+
+
+
+
+
+
+
+  
+  ggplot2::geom_boxplot()
+    
+plt(train_full_augmented)
+plt(test_full_augmented)
+
+train_full_augmented %>%  
+    ggplot2::ggplot(ggplot2::aes(x = .pred, y = gradient_axis1)) +
+    ggplot2::geom_point(ggplot2::aes(color = year)) + 
+    ggplot2::geom_abline(intercept = 0, slope = 1)
+test_full_augmented %>% 
+    ggplot2::ggplot(ggplot2::aes(x = .pred, y = gradient_axis1)) +
+    ggplot2::geom_point(ggplot2::aes(color = year)) + 
+    ggplot2::geom_abline(intercept = 0, slope = 1, color = "darkred")
+
+# Effect of the year ? 
+
+
+test_full_augmented %>% 
+  dplyr::filter(residuals < quantile(residuals, prob = 0.02))
+
+
+
+# ------------  >> #
+
 
 
 # What about t-outlier test
@@ -129,7 +312,7 @@ residuals <- train_full_pls_fit_bst %>%
   dplyr::mutate(residuals = gradient_axis1 - .pred) %>% 
   dplyr::pull(residuals)
 
-threshold <- mean(residuals) + c(-99, 99) * sd(residuals)
+threshold <- mean(residuals) + c(-3, 3) * sd(residuals)
 train_full_cleaned <-  train_full[
   residuals > min(threshold) & residuals < max(threshold), 
 ]

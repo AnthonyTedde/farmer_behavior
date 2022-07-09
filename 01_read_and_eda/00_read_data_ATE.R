@@ -41,6 +41,64 @@ milk_dat %<>%
 
 save(milk_dat, file = "data/milk_dat.rda")
   
+# ----------------------------------------------------------------------------------------
+# Read monthly milk data ####
+# ----------------------------------------------------------------------------------------
+
+milk_month_dat <- read.csv(
+  file="raw_data/milk_month.csv",
+  sep = ';', dec = ".",
+  header=FALSE, 
+  na.strings = c("."),
+  col.names = milk_month_col_names
+)
+
+milk_month_dat %<>%  
+  dplyr::mutate( 
+    year_quarter = lubridate::quarter(lubridate::my(paste(month, year, sep = "-"))),
+    .after = month
+  ) %>% 
+  dplyr::mutate( year_quarter = dplyr::case_when(
+    year_quarter == 1 ~ "Winter",
+    year_quarter == 2 ~ "Spring",
+    year_quarter == 3 ~ "Summer",
+    year_quarter == 4 ~ "Autumn"
+  ) ) 
+
+t <- milk_month_dat[1:10, 1:12]
+mean(is.na(milk_month_dat$lactose))
+
+milk_quarter_dat <- milk_month_dat %>% 
+  dplyr::group_by(farmerID, year, year_quarter) %>% 
+  dplyr::summarise(
+  dplyr::across(dplyr::all_of(c(labo, predictions)), 
+                .fns = function(x){
+    weight <- dplyr::cur_data() %>% 
+      dplyr::pull(paste("n", dplyr::cur_column(), sep = "_"))
+    weighted.mean(x, weight, na.rm = T)
+  })
+)
+
+dim(milk_quarter_dat)
+
+milk_quarter_dat %<>% 
+  dplyr::ungroup() %>% 
+  dplyr::mutate(dplyr::across(
+    .cols = c("fat", "protein", "lactose"),
+    .fns = function(x) x/10
+  )) %>% 
+  # 2. Update milk to express dl instead of kg
+  dplyr::mutate(pmilk_dl = pmilk * 10/1.03) %>% 
+  # 3. Express the FA in percentage in fat %>% 
+  dplyr::mutate(dplyr::across(
+    .cols = dplyr::all_of(FAs),
+    ~ (.x * pmilk_dl) / (fat * pmilk_dl)
+    # list(perc = ~ (.x * pmilk_dl) / (fat * pmilk_dl))
+  ))
+
+save(milk_quarter_dat, 
+     file = "data/milk_quarter_dat.rda", 
+     compress = "xz")
 
 # ----------------------------------------------------------------------------------------
 # Read accounting data ####

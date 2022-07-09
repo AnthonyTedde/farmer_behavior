@@ -6,6 +6,7 @@ library(magrittr)
 # -------------------------------------------------------------------------------------- #
 
 data("working_dat")
+data("working_dat_quarter")
 
 
 # -------------------------------------------------------------------------------------- #
@@ -103,6 +104,11 @@ test_q10 <- get_train_quantile_base(q = .1, train = F)
 train_q05 <- get_train_quantile_base(q = .05) 
 test_q05 <- get_train_quantile_base(q = .05, train = F)
 
+train_quarter_full <- working_dat_quarter %>% 
+  dplyr::filter(farmerID %in% train_id)
+test_quarter_full <- working_dat_quarter %>% 
+  dplyr::filter(farmerID %in% test_id)
+
 
 # -------------------------------------------------------------------------------------- #
 # Print some data ####
@@ -129,12 +135,15 @@ dplyr::bind_rows(
 # Save ####
 # -------------------------------------------------------------------------------------- #
 
-save(train_full, file = "data/train_full.rda")
-save(test_full, file = "data/test_full.rda") 
-save(train_q20, file = "data/train_q20.rda")
-save(test_q20, file = "data/test_q20.rda") 
-save(train_q10, file = "data/train_q10.rda")
-save(test_q10, file = "data/test_q10.rda") 
-save(train_q05, file = "data/train_q05.rda")
-save(test_q05, file = "data/test_q05.rda") 
+save(train_full, file = "data/train_full.rda", compress = "xz")
+save(test_full, file = "data/test_full.rda", compress = "xz") 
+save(train_quarter_full, file = "data/train_quarter_full.rda", compress = "xz")
+save(test_quarter_full, file = "data/test_quarter_full.rda", compress = "xz") 
+
+save(train_q20, file = "data/train_q20.rda", compress = "xz")
+save(test_q20, file = "data/test_q20.rda", compress = "xz") 
+save(train_q10, file = "data/train_q10.rda", compress = "xz")
+save(test_q10, file = "data/test_q10.rda", compress = "xz") 
+save(train_q05, file = "data/train_q05.rda", compress = "xz")
+save(test_q05, file = "data/test_q05.rda", compress = "xz") 
 
