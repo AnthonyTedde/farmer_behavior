@@ -230,36 +230,4 @@ for(t in thres){
 tictoc::toc()
 
 
-
-
-tune::show_best(pls_mod_wfl_rslt)
-one_se <- tune::select_by_one_std_err(pls_mod_wfl_rslt, num_comp, predictor_prop)
-
-pls_fit <- pls_mod_wfl %>% 
-  tune::finalize_workflow(one_se) %>% 
-  parsnip::fit(dat)
-
-
-dat %>% 
-  broom::augment(x = pls_fit) %>% 
-  yardstick::rmse(truth = gradient_axis1, estimate = .pred)
-dat %>% 
-  broom::augment(x = pls_fit) %>% 
-  yardstick::rsq(truth = gradient_axis1, estimate = .pred)
-
-test_full %>% 
-  broom::augment(x = pls_fit) %>% 
-  yardstick::rmse(truth = gradient_axis1, estimate = .pred)
-test_full %>% 
-  broom::augment(x = pls_fit) %>% 
-  yardstick::rsq(truth = gradient_axis1, estimate = .pred)
-
-
-# -------------------------------------------------------------------------------------- #
-# Plot restults ####
-# -------------------------------------------------------------------------------------- #
-
-test_full %>% 
-  broom::augment(x = pls_fit) %>% 
-  ggplot2::ggplot(ggplot2::aes(x = gradient_axis1, y = .pred)) +
-  ggplot2::geom_point()
+# Thank you CECI !
