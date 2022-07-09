@@ -32,13 +32,15 @@ compute_importance <- function(dat, type){
   rf <- randomForest::randomForest(
     technico_milk_X,  technico_milk_y, 
     mtry = floor(ncol(dat) / 3),
-    ntree=5000, importance = T
+    ntree=10000, importance = T
   )
   tictoc::toc()
   
   mdl_name <- paste("rf", type, sep = "_")
   assign(mdl_name, rf)
-  save(list = mdl_name, file = here::here("data", glue::glue("{mdl_name}.rda")))
+  save(list = mdl_name, 
+       file = here::here("data", glue::glue("{mdl_name}.rda")),
+       compress = "xz")
   return(rf)
 } 
 
@@ -58,20 +60,20 @@ get_importance <- function(thres = 0, dat, type){
 } 
 
 # Test
-working_full_dat <-  dplyr::bind_rows(train_full, test_full) %>%
-  dplyr::select(-c("farmerID", "year"))
-working_quarer_dat <- dplyr::bind_rows(train_quarter_full, test_quarter_full) %>%
-  dplyr::select(-c("farmerID", "year"))
-
-get_importance_full <- get_importance(thres = .6, dat = working_full_dat,
-                                      type = "full")
-get_importance_quarter <- get_importance(dat = working_quarer_dat,
-                                         type = "quarter")
-
-data("rf_full")
-data("rf_quarter")
-randomForest::varImpPlot(rf_full)
-randomForest::varImpPlot(rf_quarter)
+# working_full_dat <-  dplyr::bind_rows(train_full, test_full) %>%
+#   dplyr::select(-c("farmerID", "year"))
+# working_quarer_dat <- dplyr::bind_rows(train_quarter_full, test_quarter_full) %>%
+#   dplyr::select(-c("farmerID", "year"))
+# 
+# get_importance_full <- get_importance(thres = .6, dat = working_full_dat,
+#                                       type = "full")
+# get_importance_quarter <- get_importance(dat = working_quarer_dat,
+#                                          type = "quarter")
+# 
+# data("rf_full")
+# data("rf_quarter")
+# randomForest::varImpPlot(rf_full)
+# randomForest::varImpPlot(rf_quarter)
 
 # -------------------------------------------------------------------------------------- #
 # Create recipe specification ####
@@ -192,8 +194,9 @@ doParallel::registerDoParallel(cores = ncpu)
 options(tidymodels.dark = T)
 
 # dat_vect <- c("train_full", "train_q20", "train_q10", "train_q05") 
-dat_vect <- c("train_full", "train_quarter_full") 
 m <- "xgb"
+
+dat_vect <- c("train_full", "train_quarter_full") 
 
 thres <- seq(0, .9, by = .1) # CECI by change by .1
 
