@@ -72,7 +72,7 @@ tech_identification_var <- c("CFERME", "exercice")
 
 # Matching table names
 matching_col_names <- c("lot", "poslot2", "labo_dt", "farmerID", "sample_dt",
-                 "CFERME", "fin")
+                        "CFERME", "fin")
 
 # Potential predictors from milk analysis
 milk_potential_predictors <- c(
@@ -116,10 +116,14 @@ y <- "gradient_axis1"
 
 if ( grepl("[ate][Lalitude]", Sys.info()["nodename"]) ){
   # Then local
+  # ncpu <- 5
+  # niter <- 15
+  # initial_set_n <- 10
+  # early_stop <- 1
   ncpu <- 5
-  niter <- 15
-  initial_set_n <- 10
-  early_stop <- 1
+  niter <- 200
+  initial_set_n <- 20
+  early_stop <- 20
 }else{ 
   ncpu <- 10
   niter <- 1000

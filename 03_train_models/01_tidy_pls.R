@@ -1,17 +1,23 @@
 library(magrittr)
 library(plsmod)
 
+if(file.exists("data/dat_vect.rda")){
+  data("dat_vect")
+}else{
+  # dat_vect <- c("train_year_full", "train_season_full", "train_season_partial", 
+  #               "train_winsum_full", "train_winsum_partial")  
+  # dat_vect <- c("train_year_corrected_full", "train_season_corrected_full", 
+  #               "train_season_corrected_partial", "train_winsum_corrected_full", 
+  #               "train_winsum_corrected_partial")
+  dat_vect <- c("train_season_corrected_full", "train_season_corrected_partial", 
+                "train_winsum_corrected_full", "train_winsum_corrected_partial")
+}
+
 # CECI Load data
 # Training data
-data("train_full")
-data("train_q20")
-data("train_q10")
-data("train_q05")
+data(list = dat_vect)
 # Cross-validation data
-data("train_full_cv")
-data("train_q20_cv")
-data("train_q10_cv")
-data("train_q05_cv")
+data(list = paste(dat_vect, "cv", sep = "_"))
 
 # CECI: change ncpu
 source("globals/global_variables.R")  
@@ -19,21 +25,32 @@ source("helper_functions/misc.R")
 
 
 # -------------------------------------------------------------------------------------- #
+# data ####
+# -------------------------------------------------------------------------------------- #
+# train_year_working <- train_year_full %>% 
+#   dplyr::select(-c("farmerID", "year"))
+# train_year_working_cv <- train_year_full_cv
+# train_season_working <- train_season_full %>% 
+#   dplyr::select(-c("farmerID", "year"))
+# train_season_working_cv <- train_season_full_cv
+
+# -------------------------------------------------------------------------------------- #
 # Create recipe specification ####
 # -------------------------------------------------------------------------------------- #
 
 get_recipe <- function(dat){
   
-  form <- milk_potential_predictors[milk_potential_predictors %in% names(dat)] %>% 
-    paste(collapse = " + ") %>% 
-    paste(y, ., sep = " ~ ") %>% 
-    formula
   
-  recipes::recipe(form, data = dat) %>% 
+  recipes::recipe(
+    x = dat, 
+    var = names(dat),
+    roles = c("outcome", rep("predictor", length(names(dat)) -1))
+  ) %>% 
+    # recipes::step_ns(recipes::all_numeric_predictors(), deg_free = ) %>% 
     bestNormalize::step_orderNorm(recipes::all_numeric_predictors())
   
 }
- 
+
 
 # -------------------------------------------------------------------------------------- #
 # Create model specification ####
@@ -65,15 +82,15 @@ get_workflow <- function(mod, rec){
 
 # pls_mod_wfl %>% tune::tunable()
 # pls_mod_wfl %>% hardhat::extract_parameter_set_dials() %>%  dplyr::pull(object)
-  
+
 get_param <- function(wfl){
   
-wfl %>% 
-  hardhat::extract_parameter_set_dials() %>% 
-  update(
-    num_comp = dials::num_comp(range = c(1L, 99L))
-  )
-
+  wfl %>% 
+    hardhat::extract_parameter_set_dials() %>% 
+    update(
+      num_comp = dials::num_comp(range = c(1L, 99L))
+    )
+  
 }
 
 
@@ -103,21 +120,16 @@ run_mdl <- function(wfl, dat_cv, param, iter = 500){
 # For test purpose
 # initial_set_n <- 4
 # early_stop <- 1
- 
+
 doParallel::registerDoParallel(cores = ncpu) 
 options(tidymodels.dark = T)
 
-if(file.exists("data/dat_vect.rda")){
-  data("dat_vect")
-}else{
-  dat_vect <- c("train_full", "train_q20", "train_q10", "train_q05")  
-}
 
 tictoc::tic()
 for(d in dat_vect){
   print(glue::glue("#-------------------     {d}     -------------------#"))
   # data
-  dat <- get(d)
+  dat <- get(d) %>%  dplyr::select(-c("farmerID", "year"))
   dat_cv <- get(paste(d, "cv", sep = "_"))
   # Get specifications
   recipe <- get_recipe(dat)
@@ -125,12 +137,7 @@ for(d in dat_vect){
   wfl <- get_workflow(mod, recipe) 
   param <- get_param(wfl)
   # Run models 
-  mdl <- run_mdl(
-    wfl, 
-    dat_cv, 
-    param, 
-    iter = niter # CECI globals
-  )
+  mdl <- run_mdl( wfl,  dat_cv,  param,  iter = niter ) # niter -> CECI globals 
   # Save result
   save_model(obj = mdl, type = "rslt")
   save_model(obj = wfl, type = "wfl")

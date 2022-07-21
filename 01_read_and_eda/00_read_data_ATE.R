@@ -2,44 +2,6 @@ library(magrittr)
 
 source("globals/global_variables.R")
 
-# ----------------------------------------------------------------------------------------
-# Read milk data ####
-# ----------------------------------------------------------------------------------------
-  
-#file's reading
-milk_dat <- read.csv(
-  file="raw_data/milk_total.csv",
-  sep = ';', dec = ".",
-  header=FALSE, 
-  na.strings = c("."), 
-  col.names = milk_col_names
-)
-
-head(milk_dat)  
-
-# Fatty acids columns
-FAs <- c(
-  grep(pattern = "^pC[[:digit:]]", milk_col_names, value = T),
-  grep(pattern = "^pFA", milk_col_names, value = T)
-)
-
-# Units
-milk_dat %<>% 
-  # 1. Change fat, protein, lactose g/cl -> g/dl (* 10)
-  dplyr::mutate(dplyr::across(
-    .cols = c("fat", "protein", "lactose"),
-    .fns = function(x) x/10
-  )) %>% 
-  # 2. Update milk to express dl instead of kg
-  dplyr::mutate(pmilk_dl = pmilk * 10/1.03) %>% 
-  # 3. Express the FA in percentage in fat %>% 
-  dplyr::mutate(dplyr::across(
-    .cols = dplyr::all_of(FAs),
-    ~ (.x * pmilk_dl) / (fat * pmilk_dl)
-    # list(perc = ~ (.x * pmilk_dl) / (fat * pmilk_dl))
-  ))
-
-save(milk_dat, file = "data/milk_dat.rda")
   
 # ----------------------------------------------------------------------------------------
 # Read monthly milk data ####
@@ -53,53 +15,118 @@ milk_month_dat <- read.csv(
   col.names = milk_month_col_names
 )
 
-milk_month_dat %<>%  
-  dplyr::mutate( 
-    year_quarter = lubridate::quarter(lubridate::my(paste(month, year, sep = "-"))),
-    .after = month
-  ) %>% 
-  dplyr::mutate( year_quarter = dplyr::case_when(
-    year_quarter == 1 ~ "Winter",
-    year_quarter == 2 ~ "Spring",
-    year_quarter == 3 ~ "Summer",
-    year_quarter == 4 ~ "Autumn"
-  ) ) 
-
-t <- milk_month_dat[1:10, 1:12]
-mean(is.na(milk_month_dat$lactose))
-
-milk_quarter_dat <- milk_month_dat %>% 
-  dplyr::group_by(farmerID, year, year_quarter) %>% 
-  dplyr::summarise(
-  dplyr::across(dplyr::all_of(c(labo, predictions)), 
-                .fns = function(x){
-    weight <- dplyr::cur_data() %>% 
-      dplyr::pull(paste("n", dplyr::cur_column(), sep = "_"))
-    weighted.mean(x, weight, na.rm = T)
-  })
-)
-
-dim(milk_quarter_dat)
-
-milk_quarter_dat %<>% 
-  dplyr::ungroup() %>% 
+milk_month_dat %<>% 
   dplyr::mutate(dplyr::across(
     .cols = c("fat", "protein", "lactose"),
     .fns = function(x) x/10
-  )) %>% 
-  # 2. Update milk to express dl instead of kg
-  dplyr::mutate(pmilk_dl = pmilk * 10/1.03) %>% 
-  # 3. Express the FA in percentage in fat %>% 
-  dplyr::mutate(dplyr::across(
-    .cols = dplyr::all_of(FAs),
-    ~ (.x * pmilk_dl) / (fat * pmilk_dl)
-    # list(perc = ~ (.x * pmilk_dl) / (fat * pmilk_dl))
-  ))
+  )) 
 
-save(milk_quarter_dat, 
-     file = "data/milk_quarter_dat.rda", 
-     compress = "xz")
+milk_month_dat %<>% 
+  dplyr::mutate(
+    lactose = ifelse(lactose>10, lactose / 10, lactose)
+  ) 
+ 
 
+milk_month_dat$fat %>% hist(breaks = 500)
+milk_month_dat$fat[milk_month_dat$fat < 1] %>% hist(breaks = 100)
+milk_month_dat$protein %>% hist(breaks = 500)
+milk_month_dat$lactose %>% hist(breaks = 500)
+milk_month_dat$pprotein_N %>% hist(breaks = 500)
+milk_month_dat$pprotein_N %>% range(na.rm = T)
+quantile(milk_month_dat$pprotein_N, na.rm = T)
+sum(milk_month_dat$pprotein_N > 600, na.rm = T)
+
+quantile(milk_month_dat$protein, na.rm = T)
+quantile(milk_month_dat$fat, na.rm = T)
+quantile(milk_month_dat$lactose, na.rm = T)
+
+# MAT
+milk_month_dat %<>% 
+  tibble::as_tibble() %>% 
+  dplyr::filter(
+    fat > 1.5 & fat < 9, # ICAR + remove skim milk
+    protein > 1 & protein < 7 # ICAR
+  )
+
+milk_month_dat %<>% 
+  dplyr::filter(year < 2022)
+
+# Quid des valeurs manquantes
+naniar::gg_miss_upset(milk_month_dat)
+ 
+# Impute missing lactose
+working_month_dat <- milk_month_dat %>% 
+  dplyr::select(-c("farmerID", "year", "month"), -dplyr::starts_with("n_"))
+
+ncomp <- 20
+lactose_pls <- pls::mvr(lactose ~ ., ncomp = ncomp, data = working_month_dat,
+                        scale = T, method = pls::pls.options()$plsralg)
+
+# no_na <- working_month_dat %>% 
+#   tidyr::drop_na()
+# no_na %>% 
+#   dplyr::mutate(
+#     .pred = predict(lactose_pls, newdata = no_na, ncomp = ncomp)
+#   ) %>% 
+#   yardstick::rsq(truth = lactose, estimate = .pred)
+
+milk_month_dat_no_na <- milk_month_dat %>% 
+  tidyr::drop_na(lactose)
+milk_month_dat_na <- milk_month_dat %>% 
+  dplyr::filter(is.na(lactose)) %>% 
+  tidyr::drop_na(-c("lactose")) 
+milk_month_dat_na %<>% 
+  dplyr::mutate(lactose = predict(lactose_pls, newdata = milk_month_dat_na, ncomp = ncomp)) %>% 
+  dplyr::mutate(n_lactose = 1)
+
+milk_month_dat_na$lactose %>% hist(breaks = 100)
+
+milk_month_dat <- dplyr::bind_rows(
+  milk_month_dat_no_na, milk_month_dat_na
+)
+dim(milk_month_dat)
+
+naniar::gg_miss_upset(milk_month_dat)
+milk_month_dat %<>% 
+  tidyr::drop_na()
+milk_month_dat$n_lactose %>% table
+milk_month_dat %>% 
+  dplyr::filter(n_lactose > 30)
+
+
+milk_month_dat$fat %>% hist(breaks = 100)
+milk_month_dat$protein %>% hist(breaks = 100)
+milk_month_dat$lactose %>% hist(breaks = 100)  
+
+fat_norm <- bestNormalize::orderNorm(milk_month_dat$fat)
+protein_norm <- bestNormalize::orderNorm(milk_month_dat$protein)
+lactose_norm <- bestNormalize::orderNorm(milk_month_dat$lactose)
+
+fat_norm$x.t %>% hist(breaks = 100)
+protein_norm$x.t %>% hist(breaks = 100)
+lactose_norm$x.t %>% hist(breaks = 100)
+
+rm_tails <- function(dat, p = 0.001){ 
+  up <- quantile(fat_norm$x.t, probs = 1 - p/2)
+  down <- quantile(fat_norm$x.t, probs = 0 + p/2)
+  down < dat & dat < up
+}
+fat_keep <- rm_tails(fat_norm$x.t)
+prot_keep <- rm_tails(protein_norm$x.t)
+lactose_keep <- rm_tails(lactose_norm$x.t)
+
+keep <- fat_keep & prot_keep & lactose_keep
+
+milk_month_dat <- milk_month_dat[keep, ]
+
+milk_month_dat$fat %>% hist(breaks = 100)
+milk_month_dat$protein %>% hist(breaks = 100)
+milk_month_dat$lactose %>% hist(breaks = 100)  
+
+dim(milk_month_dat)
+save(milk_month_dat, file = "data/milk_month_dat.rda", compress = "xz")
+
+  
 # ----------------------------------------------------------------------------------------
 # Read accounting data ####
 # ---------------------------------------------------------------------------------------- 
@@ -121,6 +148,11 @@ technico_dat <- read.table(
   na.strings = c(".", "", " ", "\t") 
   # fill = T
 )
+
+
+#-------------
+# AC filter
+#-------------
 
 technico_dat %<>% 
   dplyr::mutate(
@@ -168,8 +200,47 @@ technico_dat %<>%
   )) %>% 
   tibble::as_tibble()
 
-# AC Dalcq filters
+#-------------
+# Remove NAs
+#-------------
 
+naniar::gg_miss_upset(technico_dat) 
+dim(technico_dat) 
+technico_dat %<>% 
+  tidyr::drop_na()
+
+# milked cows per hectare of forage area
+technico_dat$VACTRAHASF %>% hist(breaks = 100)
+# milk yield per hectare of forage area
+technico_dat$LITLAIHASF %>% hist(breaks = 100)
+# livestock unit per hectare of forage area
+technico_dat$UGBTOTHASF %>% hist(breaks = 100)
+# percentage of grazed area  in the forage area
+technico_dat$PCSCONSSF %>% hist(breaks = 100)
+# Percentage of corn silage in the forage area
+technico_dat$PCMAISSF %>% hist(breaks = 50)
+# Percentage of silage grass in the forage area
+technico_dat$PCPRAIRISF %>% hist(breaks = 50)
+# percentage of first hay cut  in the forage area
+technico_dat$PCFAUCH1C %>% hist(breaks = 100)
+# Percentage of other hay cut in the forage area 
+technico_dat$PCFAUCHAC %>% hist(breaks = 100)
+# Percentage of first silage cut  in the forage area
+technico_dat$PCENS1C %>% hist(breaks = 100)
+# Percentage of other silage cut in the forage area
+technico_dat$PCENSAC %>% hist(breaks = 100)
+# N fertilizer per hectare of grazed area 
+technico_dat$NHAPRE %>% hist(breaks = 100) 
+# Amount of grazed area per livestock unit
+technico_dat$AREUGBPRE %>% hist(breaks = 100) 
+technico_dat$AREUGBPRE %>% range
+# amount of corn silage per livestock unit
+technico_dat$AREUGBMAI %>% hist(breaks = 100)  
+# concentrate equivalents purchased per milked cow
+technico_dat$EQCONCVT %>% hist(breaks = 100) 
+# milk yield per milked cow
+technico_dat$LITVACHEVT %>% hist(breaks = 100) 
+   
 save(technico_dat, file = "data/technico_dat.rda")
 
 

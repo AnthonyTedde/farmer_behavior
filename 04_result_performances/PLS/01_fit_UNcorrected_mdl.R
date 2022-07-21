@@ -3,55 +3,50 @@ library(magrittr)
 library(plsmod)
 library(bestNormalize)
 
-dat_vect <- c("train_full", "train_q20", "train_q10", "train_q05") 
+suffixe <- c("year_full", "season_full", "season_partial",  
+             "winsum_full", "winsum_partial")  
+train_vect <- paste("train", suffixe, sep = "_")  
+test_vect <- paste("test", suffixe, sep = "_")
+rslt_vect <- paste("train", suffixe, "rslt", sep = "_")
+wfl_vect <- paste("train", suffixe, "wfl", sep = "_")
 
-# Load data
-data("train_full")
-data("train_q20")
-data("train_q10")
-data("train_q05")
-data("test_full")
-data("technico_milk")
-
-# Load models results
-data("train_full_rslt")
-data("train_q20_rslt")
-data("train_q10_rslt")
-data("train_q05_rslt")
-
-# Load workflow
-data("train_full_wfl")
-data("train_q20_wfl")
-data("train_q10_wfl")
-data("train_q05_wfl")
-
-
+data(list = c(train_vect, test_vect, rslt_vect, wfl_vect))
+ 
+   
 # -------------------------------------------------------------------------------------- #
 # Compute fitted models
 # -------------------------------------------------------------------------------------- #
 
-for(d in dat_vect){
+info <- list(train = train_vect, 
+             test = test_vect, 
+             rslt = rslt_vect, 
+             wfl = wfl_vect,
+             suffixe = suffixe) %>% 
+  purrr::pmap(list)
+for(d in info){
   
-  rslt <- get(paste(d, "rslt", sep = "_"))
+  
+  rslt <- get(d$rslt)
+  wfl <- get(d$wfl)
   bst <- rslt %>% tune::select_best()
   # onese <- rslt %>% tune::select_by_one_std_err(num_comp, predictor_prop)
   onese <- rslt %>% tune::select_by_one_std_err(num_comp)
   
-  dat <- get(d)
+  dat <- get(d$train)
   
   # fit bst
-  fit_bst <- get(paste(d, "wfl", sep = "_")) %>% 
+  fit_bst <- wfl %>% 
     tune::finalize_workflow(bst) %>% 
     parsnip::fit(dat)
   # fit onese
-  fit_onese <- get(paste(d, "wfl", sep = "_")) %>% 
+  fit_onese <- wfl %>% 
     tune::finalize_workflow(onese) %>% 
     parsnip::fit(dat)
   
-  fit_bst_name <- paste(d, "pls_fit_bst", sep = "_") 
+  fit_bst_name <- paste(d$train, "pls_fit_bst", sep = "_") 
   assign(fit_bst_name, fit_bst)
   
-  fit_onese_name <- paste(d, "pls_fit_onese", sep = "_") 
+  fit_onese_name <- paste(d$train, "pls_fit_onese", sep = "_") 
   assign(fit_onese_name, fit_onese)
   
   # Save
@@ -69,20 +64,17 @@ for(d in dat_vect){
 # Compute the performances
 # -------------------------------------------------------------------------------------- #
 
-dat_vect
-fit_vect <- c("bst", "onese")
-mod_vect <- "pls"
-
-
-
-perf_lst <- purrr::cross( list(dat = dat_vect, 
-                              fit = fit_vect, 
-                              mod = mod_vect) ) %>% 
+info_plus <- c(
+  info %>% purrr::map(~c(.x, fit = "bst")),
+  info %>% purrr::map(~c(.x, fit = "onese")) 
+)
+perf_lst <- info_plus %>% 
   purrr::map(.f = function(d){ 
     #
-    dat_train <- get(d$dat)
-    dat_type <- strsplit(d$dat, split = "_")[[1]][length(strsplit(d$dat, split = "_")[[1]])]
-    mod <- get(glue::glue("{d$dat}_{d$mod}_fit_{d$fit}"))
+    dat_train <- get(d$train)
+    dat_test <- get(d$test)
+    dat_type <- d$suffixe
+    mod <- get(glue::glue("{d$train}_pls_fit_{d$fit}"))
     # Test and train output
     list(
       train = dat_train %>% 
@@ -92,12 +84,12 @@ perf_lst <- purrr::cross( list(dat = dat_vect,
           fit_type = d$fit,
           prd = predict(mod, new_data = dat_train) %>% dplyr::pull()
         ),
-      test = test_full %>% 
+      test = dat_test %>% 
         dplyr::mutate(
           perf_type = "test",
           data_type = dat_type,
           fit_type = d$fit,
-          prd = predict(mod, new_data = test_full) %>% dplyr::pull()
+          prd = predict(mod, new_data = dat_test) %>% dplyr::pull()
         )
     ) 
   })
@@ -109,14 +101,45 @@ perf_lst %<>%
 
 perf_lst$train %>% 
   dplyr::group_by(perf_type, data_type, fit_type) %>% 
-  yardstick::rmse(truth = gradient_axis1, estimate = prd)
+  yardstick::rmse(truth = gradient_axis1, estimate = prd) 
+  # dplyr::filter(fit_type == "bst")
 perf_lst$train %>% 
   dplyr::group_by(perf_type, data_type, fit_type) %>% 
-  yardstick::rsq(truth = gradient_axis1, estimate = prd)
+  yardstick::rsq(truth = gradient_axis1, estimate = prd) %>% 
+  # dplyr::filter(fit_type == "bst")
 
 perf_lst$test %>% 
   dplyr::group_by(perf_type, data_type, fit_type) %>% 
+  yardstick::rmse(truth = gradient_axis1, estimate = prd) %>% 
+  dplyr::filter(fit_type == "bst")
+
+perf_lst$test %>% 
+  dplyr::group_by(perf_type, data_type, fit_type) %>% 
+  yardstick::rsq(truth = gradient_axis1, estimate = prd) %>% 
+  dplyr::filter(fit_type == "onese")
+
+
+perf_lst$test %>% 
+  dplyr::filter(data_type == "season", fit_type == "bst") %>% 
+  dplyr::group_by(year) %>% 
   yardstick::rmse(truth = gradient_axis1, estimate = prd)
+  
+perf_lst$train %>% 
+  dplyr::mutate(year = as.factor(year)) %>% 
+  dplyr::filter(data_type == "season_partial", fit_type == "onese") %>% 
+  dplyr::group_by(farmerID) %>% 
+  # dplyr::summarise(
+  #   gradient_axis1 = mean(gradient_axis1),
+  #   prd = mean(prd)
+  # ) %>% 
+  ggplot2::ggplot(ggplot2::aes(x = prd, y = gradient_axis1)) +
+  ggplot2::geom_point() +
+  ggplot2::geom_abline(intercept = 0, slope = 1, color = "darkred", size = 1) 
+  # ggplot2::facet_wrap("year", ncol = 2)
+
+
+
+# -------------------- #
 
 # - Best full -  << #
 
@@ -135,7 +158,7 @@ train_full_rslt$.metrics[[1]]
 tune::show_best(train_full_rslt, n = 700) %>% 
   ggplot2::ggplot(ggplot2::aes(num_comp, y = predictor_prop, z = mean)) +
   ggplot2::stat_density2d_filled()
-  
+
 plt <- function(dat){ 
   dat %>% 
     ggplot2::ggplot(ggplot2::aes(x = .pred, y = gradient_axis1)) +
@@ -157,7 +180,7 @@ augment_dt <- function(newd){
         residuals >= quantile(residuals, prob = .990) ~ F,
         T ~ T
       ),
-      ) %>% 
+    ) %>% 
     dplyr::inner_join(rem)
 }
 
@@ -275,20 +298,20 @@ test_full_augmented %>%
 
 
 
-  
-  ggplot2::geom_boxplot()
-    
+
+ggplot2::geom_boxplot()
+
 plt(train_full_augmented)
 plt(test_full_augmented)
 
 train_full_augmented %>%  
-    ggplot2::ggplot(ggplot2::aes(x = .pred, y = gradient_axis1)) +
-    ggplot2::geom_point(ggplot2::aes(color = year)) + 
-    ggplot2::geom_abline(intercept = 0, slope = 1)
+  ggplot2::ggplot(ggplot2::aes(x = .pred, y = gradient_axis1)) +
+  ggplot2::geom_point(ggplot2::aes(color = year)) + 
+  ggplot2::geom_abline(intercept = 0, slope = 1)
 test_full_augmented %>% 
-    ggplot2::ggplot(ggplot2::aes(x = .pred, y = gradient_axis1)) +
-    ggplot2::geom_point(ggplot2::aes(color = year)) + 
-    ggplot2::geom_abline(intercept = 0, slope = 1, color = "darkred")
+  ggplot2::ggplot(ggplot2::aes(x = .pred, y = gradient_axis1)) +
+  ggplot2::geom_point(ggplot2::aes(color = year)) + 
+  ggplot2::geom_abline(intercept = 0, slope = 1, color = "darkred")
 
 # Effect of the year ? 
 

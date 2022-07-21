@@ -1,49 +1,37 @@
 library(magrittr)
-data("milk_dat")
-data("milk_quarter_dat")
+data("milk_year_02_dat")
+data("milk_season_02_dat")
 
 
 # -------------------------------------------------------------------------------------- #
 # ICAR ####
 # -------------------------------------------------------------------------------------- #
 
-milk_dat %>% 
-  dplyr::pull(fat) %>% hist(breaks = 50)
-milk_quarter_dat %>% 
-  dplyr::pull(fat) %>% hist(breaks = 50)
+milk_year_02_dat %>%  dplyr::pull(fat) %>% hist(breaks = 50)
+milk_season_02_dat %>%  dplyr::pull(fat) %>% hist(breaks = 50)
 
-milk_dat %>% 
-  dplyr::pull(protein) %>% hist(breaks = 50)
-milk_quarter_dat %>% 
-  dplyr::pull(protein) %>% hist(breaks = 50)
+milk_year_02_dat %>%  dplyr::pull(protein) %>% hist(breaks = 50)
+milk_season_02_dat %>%  dplyr::pull(protein) %>% hist(breaks = 50)
 
-milk_dat %>% 
-  dplyr::pull(pprotein_N) %>% hist(breaks = 50)
-milk_quarter_dat %>% 
-  dplyr::pull(pprotein_N) %>% hist(breaks = 50)
-
-milk_dat %<>% 
-  dplyr::filter(fat > 1.5 & fat < 9) %>% 
-  dplyr::filter(fat > 1 & fat < 7) 
-milk_quarter_dat %<>% 
-  dplyr::filter(fat > 1.5 & fat < 9) %>% 
-  dplyr::filter(fat > 1 & fat < 7) 
-
+milk_year_02_dat %>%  dplyr::pull(pprotein_N) %>% hist(breaks = 50)
+milk_season_02_dat %>%  dplyr::pull(pprotein_N) %>% hist(breaks = 50)
 
 # -------------------------------------------------------------------------------------- #
 # Mahalanobis ####
 # -------------------------------------------------------------------------------------- #
 
 # ----------------
-# Milk quarter
+# Milk season
 # ----------------
 
-milk_dat <- milk_quarter_dat %>% 
+threshold <- 5
+
+d <- milk_season_02_dat %>% 
   dplyr::select(-c("farmerID", "year", "year_quarter"))
 
-milk_pca <- FactoMineR::PCA(milk_dat, ncp = 20, graph = F)
+milk_pca <- FactoMineR::PCA(d, ncp = 30, graph = F)
 ncp <- min(which(milk_pca$eig[, 3] > 99))
-milk_pca <- FactoMineR::PCA(milk_dat, ncp = ncp, graph = F)
+milk_pca <- FactoMineR::PCA(d, ncp = ncp, graph = F)
 
 milk_maha <- mahalanobis(milk_pca$ind$coord,
                          colMeans(milk_pca$ind$coord),
@@ -53,19 +41,19 @@ milk_gh <- milk_maha / ncp
 # hist(milk_gh, breaks = 50)
 plot(milk_pca, label = "none")
 
-mean(milk_gh > 3)
+mean(milk_gh > threshold)
 
-milk_quarter_dat <- milk_quarter_dat[milk_gh < 3, ]
+milk_season_02_dat <- milk_season_02_dat[milk_gh < threshold, ]
 
 
 # ----------------
-# technico dat
+# year dat
 # ----------------
 
-milk_sub_dat <- milk_dat %>% 
+milk_sub_dat <- milk_year_02_dat %>% 
   dplyr::select(-c("farmerID", "year"))
 
-milk_pca <- FactoMineR::PCA(milk_sub_dat, ncp = 20, graph = F)
+milk_pca <- FactoMineR::PCA(milk_sub_dat, ncp = 30, graph = F)
 ncp <- min(which(milk_pca$eig[, 3] > 99))
 milk_pca <- FactoMineR::PCA(milk_sub_dat, ncp = ncp, graph = F)
 
@@ -77,17 +65,20 @@ milk_gh <- milk_maha / ncp
 # hist(milk_gh, breaks = 50)
 plot(milk_pca, label = "none")
 
-mean(milk_gh > 3)
+mean(milk_gh > threshold)
 
-milk_dat <- milk_dat[milk_gh < 3, ]
+milk_year_02_dat <- milk_year_02_dat[milk_gh < threshold, ]
 
 # -------------------------------------------------------------------------------------- #
 # save ####
 # -------------------------------------------------------------------------------------- #
 
-save(milk_dat, 
-     file ="data/milk_dat.rda", 
+milk_year_clean_dat <- milk_year_02_dat
+milk_season_clean_dat <- milk_season_02_dat
+
+save(milk_year_clean_dat, 
+     file ="data/milk_year_clean_dat.rda", 
      compress = "xz")
-save(milk_quarter_dat, 
-     file ="data/milk_quarter_dat.rda", 
+save(milk_season_clean_dat, 
+     file ="data/milk_season_clean_dat.rda", 
      compress = "xz")

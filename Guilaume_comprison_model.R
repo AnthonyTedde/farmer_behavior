@@ -12,15 +12,20 @@ any(account_milk_train_full$CFERME %in% account_milk_test_full$CFERME)
 
 dat_ATE <- technico_milk %>% dplyr::select(farmerID, CFERME) %>% 
   dplyr::inner_join(working_dat) %>% 
-  dplyr::select(CFERME, year, gradient_axis1)
+  dplyr::select(CFERME, year, gradient_axis1, pC10)
 
 dat_gui <- dplyr::bind_rows(account_milk_test_full, account_milk_train_full) %>% 
-  dplyr::select(CFERME, year, coord_dim1)
+  dplyr::select(CFERME, year, coord_dim1, AG_C10) %>% 
+  dplyr::rename(pC10 = AG_C10)
 
-dat_merge <- dplyr::inner_join(dat_ATE, dat_gui) 
+dat_merge <- dplyr::inner_join(dat_ATE, dat_gui, by = c("CFERME", "year")) 
 
 dat_merge %>% 
   ggplot2::ggplot(ggplot2::aes(x = gradient_axis1, coord_dim1)) +
+  ggplot2::geom_point()
+
+dat_merge %>% 
+  ggplot2::ggplot(ggplot2::aes(x = pC10.x, pC10.y)) +
   ggplot2::geom_point()
 
 with(dat_merge, cor(gradient_axis1, coord_dim1))
