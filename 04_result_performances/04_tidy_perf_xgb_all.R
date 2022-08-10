@@ -1,7 +1,10 @@
 library(magrittr) 
 source("globals/global_variables.R")
 
-dat_vect <- c("train_year_full", "train_season_full") 
+# dat_vect <- c("train_year_full", "train_season_full") 
+
+# train_season_partial_xgb
+dat_vect <- c("train_season_partial", "train_season_corrected_partial")
 mod_type <- "xgb"
 # quantile <- stringr::str_pad(seq(0, .2, by = .1) * 100, width = 3, pad = 0)
 # quantile <- stringr::str_pad(seq(0, .2, by = .1) * 100, width = 3, pad = 0)
@@ -9,10 +12,10 @@ quantile <- stringr::str_pad(0 * 100, width = 3, pad = 0)
 
 # Load data
 data(list = dat_vect)
-data("test_year_full")
-data("test_season_full")
+data("test_season_partial")
+data("test_season_corrected_partial")
 
-nam <- purrr::cross(list(d = dat_vect, m = mod_type, q = quantile)) %>%
+nam <- purrr::cross(list(d = dat_vect, m = mod_type)) %>%
   purrr::map(purrr::reduce, paste, sep = "_") %>% unlist
 
 # Load models results
@@ -73,16 +76,16 @@ for(d in nam){
 # Compute the performances
 # -------------------------------------------------------------------------------------- #
 
-dat_vect <- c("train_year_full", "train_season_full") 
+dat_vect <- c("train_season_partial", "train_season_corrected_partial") 
 mod_type <- "xgb"
 # quantile <- stringr::str_pad(seq(0, .2, by = .1) * 100, width = 3, pad = 0)
-quantile <- stringr::str_pad(0 * 100, width = 3, pad = 0)
+# quantile <- stringr::str_pad(0 * 100, width = 3, pad = 0)
 fit <- c("bst", "onese")
 
 
 
 perf_lst <- purrr::cross( list(dat = dat_vect, 
-                              q = quantile, 
+                              # q = quantile, 
                               mod = mod_type,
                               fit = fit) ) %>% 
   purrr::map(.f = function(d){ 
@@ -90,13 +93,13 @@ perf_lst <- purrr::cross( list(dat = dat_vect,
     print(d$dat)
     dat_train <- get(d$dat)
     dat_type <- strsplit(d$dat, split = "_")[[1]][2]
-    mod <- get(glue::glue("{d$dat}_{d$mod}_{d$q}_fit_{d$fit}"))
-    if("season" %in% (stringr::str_split(d$dat, pattern = "_") %>% unlist())){
-      test_dat <- test_season_full 
-      type <- "season"
+    mod <- get(glue::glue("{d$dat}_{d$mod}_fit_{d$fit}"))
+    if("corrected" %in% (stringr::str_split(d$dat, pattern = "_") %>% unlist())){
+      test_dat <- test_season_corrected_partial 
+      type <- "corrected"
     }else{
-      test_dat <- test_year_full
-      type <- "year"
+      test_dat <- test_season_partial
+      type <- "uncorrected"
     }
     # Test and train output
     list(
@@ -105,7 +108,7 @@ perf_lst <- purrr::cross( list(dat = dat_vect,
           perf_type = "train",
           data_type = type,
           fit_type = d$fit,
-          quantile = d$q,
+          # quantile = d$q,
           prd = predict(mod, new_data = dat_train) %>% dplyr::pull()
         ),
       test = test_dat %>% 
@@ -113,7 +116,7 @@ perf_lst <- purrr::cross( list(dat = dat_vect,
           perf_type = "test",
           data_type = type,
           fit_type = d$fit,
-          quantile = d$q,
+          # quantile = d$q,
           prd = predict(mod, new_data = test_dat) %>% dplyr::pull()
         )
     ) 
@@ -125,17 +128,17 @@ perf_lst %<>%
   purrr::map(purrr::reduce, dplyr::bind_rows)
 
 perf_lst$train %>% 
-  dplyr::group_by(perf_type, data_type, fit_type, quantile) %>% 
+  dplyr::group_by(perf_type, data_type, fit_type) %>% 
   yardstick::rmse(truth = gradient_axis1, estimate = prd)
 perf_lst$train %>% 
-  dplyr::group_by(perf_type, data_type, fit_type, quantile) %>% 
+  dplyr::group_by(perf_type, data_type, fit_type) %>% 
   yardstick::rsq(truth = gradient_axis1, estimate = prd)
 
 perf_lst$test %>% 
-  dplyr::group_by(perf_type, data_type, fit_type, quantile) %>% 
+  dplyr::group_by(perf_type, data_type, fit_type) %>% 
   yardstick::rmse(truth = gradient_axis1, estimate = prd)
 perf_lst$test %>% 
-  dplyr::group_by(perf_type, data_type, fit_type, quantile) %>% 
+  dplyr::group_by(perf_type, data_type, fit_type) %>% 
   yardstick::rsq(truth = gradient_axis1, estimate = prd)
 
 

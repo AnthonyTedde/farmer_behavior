@@ -116,17 +116,19 @@ y <- "gradient_axis1"
 
 if ( grepl("[ate][Lalitude]", Sys.info()["nodename"]) ){
   # Then local
-  # ncpu <- 5
-  # niter <- 15
-  # initial_set_n <- 10
-  # early_stop <- 1
   ncpu <- 5
-  niter <- 200
-  initial_set_n <- 20
-  early_stop <- 20
+  niter <- 15
+  initial_set_n <- 3
+  early_stop <- 1
+  latin_size <- 2
+  # ncpu <- 5
+  # niter <- 200
+  # initial_set_n <- 5
+  # early_stop <- 10
 }else{ 
   ncpu <- 10
-  niter <- 1000
-  initial_set_n <- 50
-  early_stop <- 50
+  niter <- 50
+  initial_set_n <- 5
+  early_stop <- 5
+  latin_size <- 100
 }

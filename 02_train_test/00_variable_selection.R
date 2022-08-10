@@ -5,6 +5,9 @@ data("technico_milk_season")
 data("technico_milk_year_corrected")
 data("technico_milk_season_corrected")
 
+data("milk_season_clean_dat")
+data("milk_year_clean_dat")
+
 source("globals/global_variables.R")
 
 dat <- technico_milk_year %>% 
@@ -194,6 +197,7 @@ working_season_partial %<>% get_partial_dat(sig_tbl = working_season_high_sig)
 working_winsum_full %<>% get_partial_dat(sig_tbl = working_winsum_no_sig)
 working_winsum_partial %<>% get_partial_dat(sig_tbl = working_winsum_high_sig)
 
+
  
 naniar::n_miss(working_season_partial) 
 naniar::gg_miss_upset(working_season_partial) 
@@ -253,6 +257,35 @@ naniar::n_miss(working_season_corrected_full)
 naniar::gg_miss_upset(working_season_corrected_full) 
 working_season_corrected_full %<>% 
   tidyr::drop_na()
+
+
+# -------------------------------------------------------------------------------------- #
+# Get full milk ####
+# -------------------------------------------------------------------------------------- #
+
+get_partial_milk_dat <- function(dat, sig_tbl){
+  a <- c("year_quarter", "farmerID", "year")
+  v <- sig_tbl %>% dplyr::pull(variable)
+  dat_wide <- dat %>% 
+    dplyr::select(dplyr::all_of(c(a, v))) %>% 
+    tidyr::pivot_wider(id_cols = c("farmerID", "year"),
+                       names_from = "year_quarter", values_from = v)
+  
+  
+  milk_year_clean_dat  %>% 
+    dplyr::select(!dplyr::any_of(v)) %>% 
+    dplyr::inner_join(dat_wide, by = c("farmerID", "year")) 
+}
+
+working_season_partial_milk <- milk_season_clean_dat %>% 
+  get_partial_milk_dat(sig_tbl = working_season_high_sig)
+
+
+naniar::n_miss(working_season_partial_milk) 
+naniar::gg_miss_upset(working_season_partial_milk) 
+working_season_partial_milk %<>% 
+  tidyr::drop_na()
+
 # -------------------------------------------------------------------------------------- #
 # Save the working db ####
 # -------------------------------------------------------------------------------------- #
@@ -279,4 +312,8 @@ save(working_winsum_corrected_full,
      compress = "xz")
 save(working_winsum_corrected_partial, 
      file = "data/working_winsum_corrected_partial.rda", 
+     compress = "xz")
+
+save(working_season_partial_milk, 
+     file = "data/working_season_partial_milk.rda", 
      compress = "xz")

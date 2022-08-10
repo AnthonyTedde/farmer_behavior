@@ -12,6 +12,9 @@ milk_year_corrected_clean_dat <- milk_year_clean_dat %>%
   dplyr::mutate(dplyr::across(-c("farmerID"), ~{.x - mean(.x)})) %>% 
   dplyr::ungroup()
 
+milk_year_clean_dat %>% tidyr::drop_na()
+milk_year_corrected_clean_dat %>% tidyr::drop_na()
+
 milk_season_corrected_clean_dat <- milk_season_clean_dat %>% 
   dplyr::group_by(year) %>% 
   dplyr::mutate(dplyr::across(-c("farmerID", "year_quarter"), ~{.x - mean(.x)})) %>% 
