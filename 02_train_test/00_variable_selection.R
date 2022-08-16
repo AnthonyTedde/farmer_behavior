@@ -4,6 +4,7 @@ data("technico_milk_year")
 data("technico_milk_season")
 data("technico_milk_year_corrected")
 data("technico_milk_season_corrected")
+data("milk_season_clean_dat")
 
 data("milk_season_clean_dat")
 data("milk_year_clean_dat")
@@ -107,8 +108,11 @@ get_gradient_quantile <- function(dat){
 working_season_partial <- get_gradient_quantile(working_season_full)
 working_winsum_partial <- get_gradient_quantile(working_winsum_full)
 
-working_season_corrected_partial <- get_gradient_quantile(working_season_corrected_full)
-working_winsum_corrected_partial <- get_gradient_quantile(working_winsum_corrected_full)
+
+# working_season_corrected_partial <- get_gradient_quantile(working_season_corrected_full)
+# working_winsum_corrected_partial <- get_gradient_quantile(working_winsum_corrected_full)
+
+
 
 # 1. anova
 
