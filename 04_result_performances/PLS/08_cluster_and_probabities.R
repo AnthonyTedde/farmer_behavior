@@ -102,7 +102,6 @@ clst <- hclust(data_dist, method = "ward.D")
 # clst <- hclust(data_dist, method = "complete")
 
 # plot(clst)
-
 save(clst, file = "data/clst.rda", compress = "xz")
 
 
