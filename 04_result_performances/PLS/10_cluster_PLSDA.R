@@ -1,5 +1,8 @@
 library(magrittr)
-library(dplyr) # For broom tidy
+library(plsmod)
+library(mixOmics)
+library(tidymodels)
+library(tidyverse)
 
 data("milk_season_partial_augmented")
 data("pls_final_mdl")
