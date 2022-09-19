@@ -117,7 +117,7 @@ technico_cluster_mdl <- run_mdl( wfl,  dat_cv,  param,  iter = niter ) # niter -
 tictoc::toc()
 # Save result
 
-save(technico_cluster_mdl, file = "data/technico_cluster_mdl.rda")
+save(technico_cluster_mdl, file = "data/technico_cluster_mdl.rda", compress = "xz")
 
 
 
