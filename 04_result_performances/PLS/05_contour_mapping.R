@@ -1,4 +1,8 @@
-library(magritrr)
+library(magrittr)
+library(plsmod)
+library(workflows)
+library(mixOmics)
+library(tidymodels)
 
 data("pls_final_mdl")
 data("pls_final_data")

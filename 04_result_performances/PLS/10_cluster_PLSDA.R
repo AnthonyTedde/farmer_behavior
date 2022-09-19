@@ -1,58 +1,41 @@
 library(magrittr)
+library(dplyr) # For broom tidy
 
-data("train_season_partial")
-data("test_season_partial")
+data("milk_season_partial_augmented")
 data("pls_final_mdl")
-data("milk_season_partial")
-data("clust")
+
+source("globals/global_variables.R")
+ 
+# -------------------------------------------------------------------------------------- #
+# Create dataset for training
+# -------------------------------------------------------------------------------------- #
+predictors <- broom::tidy(pls_final_mdl) %>% 
+  dplyr::filter(type == "predictors") %>% 
+  dplyr::pull(term) %>% unique
+y <- "cluster"
+
+dat <- milk_season_partial_augmented
+
+all_dt <- dat %>% 
+  dplyr::select(dplyr::all_of(c(y, predictors)))
 
 # -------------------------------------------------------------------------------------- #
-# cut the trees
+# Create train - test
 # -------------------------------------------------------------------------------------- #
-cut <- 5
-grp <- cutree(clst, k = cut)
-grp %>% table
 
-all_data_augmented %<>% 
-  dplyr::mutate(
-    cluster = glue::glue("cluster{grp}")
-  )
+set.seed(1010)
+initial_split <- rsample::initial_split(all_dt, prop = 9/10, strata = cluster)
 
-all_data_augmented %>% 
-  ggplot2::ggplot(ggplot2::aes(x = gradient_axis1, y = cluster)) +
-  ggplot2::geom_boxplot()
+train_dt <- rsample::training(initial_split)
+test_dt <- rsample::testing(initial_split)
+
+train_cv <- rsample::vfold_cv(all_dt, v = 10, strata = cluster)
+
   
-
-# -------------------------------------------------------------------------------------- #
-# PLS-DA
-# -------------------------------------------------------------------------------------- #
-
-
-
 doParallel::registerDoParallel(cores = ncpu) 
 options(tidymodels.dark = T)
 
-  
-#---------------
-# Create the dataset
-all_dt <- all_data_augmented %>% 
-  dplyr::select(!dplyr::all_of(pca_name)) %>% 
-  dplyr::relocate(cluster, .before = 1)
-
-train_dt <- all_dt %>% 
-  dplyr::filter(data_type == "train")
-test_dt <- all_dt %>% 
-  dplyr::filter(data_type == "test")
-
-#---------------
-# Create cross_validation sets
-train_dt_cv <- rsample::group_vfold_cv(
-  train_dt, 
-  group = farmerID,
-  v = 10
-)
-
-
+      
 #---------------
 # Getter functions
 get_recipe <- function(dat){  
@@ -67,7 +50,8 @@ get_recipe <- function(dat){
 get_model <- function(){ 
   parsnip::pls(
     num_comp = tune::tune(),
-    predictor_prop = tune::tune()
+    predictor_prop = tune::tune(),
+    # predictor_prop = 1
   ) %>% 
     parsnip::set_engine("mixOmics") %>% 
     parsnip::set_mode("classification") 
@@ -84,7 +68,7 @@ get_param <- function(wfl){
   wfl %>% 
     hardhat::extract_parameter_set_dials() %>% 
     update(
-      num_comp = dials::num_comp(range = c(1L, 99L))
+      num_comp = dials::num_comp(range = c(1L, 70L))
     ) 
 }
 
@@ -117,36 +101,23 @@ run_mdl <- function(wfl, dat_cv, param, iter = 500){
 
 
 # data
-dat <- train_dt %>%  
-  dplyr::select(-c(
-    "gradient_axis1", "farmerID", "year", "data_type"
-  ))
-
-dat_cv <- train_dt_cv
+dat <- train_dt
+dat_cv <- train_cv
+ 
 # Get specifications
 recipe <- get_recipe(dat)
 mod <- get_model()
 wfl <- get_workflow(mod, recipe) 
 param <- get_param(wfl)
+
 set.seed(1010)
 # Run models 
 tictoc::tic()
-cluster_mdl <- run_mdl( wfl,  dat_cv,  param,  iter = niter ) # niter -> CECI globals 
+technico_cluster_mdl <- run_mdl( wfl,  dat_cv,  param,  iter = niter ) # niter -> CECI globals 
 tictoc::toc()
 # Save result
 
-rslt_name <- glue::glue("train_pca_dim{i$ndim}_slice{i$nslice}_rslt")
-wfl_name <- glue::glue("train_pca_dim{i$ndim}_slice{i$nslice}_wfl")
-assign(rslt_name, mdl)
-assign(wfl_name, wfl)
-save(list = rslt_name, file = glue::glue("data/{rslt_name}.rda"), compress = "xz")
-save(list = wfl_name, file = glue::glue("data/{wfl_name}.rda"), compress = "xz")
-# Save progress
-choice <- choice[-1]
-save(choice, file = "data/choice.rda")
-# dat_vect <- setdiff(dat_vect, d)
-# save(dat_vect, file = here::here("data", "dat_vect.rda")) 
-
+save(technico_cluster_mdl, file = "data/technico_cluster_mdl.rda")
 
 
 

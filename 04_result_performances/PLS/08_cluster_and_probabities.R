@@ -27,7 +27,8 @@ vip_score %<>%
   dplyr::summarise(vip_mean = mean(value)) %>% 
   dplyr::arrange(desc(vip_mean))
 
-threshold <- 1.5
+# threshold <- 1.5
+threshold <- 1.2
 sum(vip_score$vip_mean > threshold)
 sum(vip_score$vip_mean)
 
@@ -86,6 +87,13 @@ train_season_partial_augmented <- all_data_augmented %>%
 
 test_season_partial_augmented <- all_data_augmented %>% 
   dplyr::filter(data_type == "test")
+
+save(milk_season_partial_augmented, 
+     file = "data/milk_season_partial_augmented.rda",
+     compress = "xz") 
+save(all_data_augmented, 
+     file = "data/all_data_augmented.rda",
+     compress = "xz")
 
 
 # -------------------------------------------------------------------------------------- #
