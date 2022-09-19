@@ -127,8 +127,8 @@ if ( grepl("[ate][Lalitude]", Sys.info()["nodename"]) ){
   # early_stop <- 10
 }else{ 
   ncpu <- 10
-  niter <- 50
+  niter <- 100
   initial_set_n <- 5
-  early_stop <- 5
+  early_stop <- 7
   latin_size <- 100
 }
